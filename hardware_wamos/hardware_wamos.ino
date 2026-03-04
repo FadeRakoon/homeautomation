@@ -5,17 +5,18 @@
 #include <math.h>
 #include <stdio.h>
 #include <ArduinoJson.h>
+#include <NewPing.h>
    
 //**********ENTER IP ADDRESS OF SERVER******************//
 
-#define HOST_IP     "localhost"       // REPLACE WITH IP ADDRESS OF SERVER ( IP ADDRESS OF COMPUTER THE BACKEND IS RUNNING ON) 
+#define HOST_IP     "10.162.0.145"       // REPLACE WITH IP ADDRESS OF SERVER ( IP ADDRESS OF COMPUTER THE BACKEND IS RUNNING ON) 
 #define HOST_PORT   "8080"            // REPLACE WITH SERVER PORT (BACKEND FLASK API PORT)
 #define route       "api/update"      // LEAVE UNCHANGED 
-#define idNumber    "620171573"       // REPLACE WITH YOUR ID NUMBER 
+#define idNumber    "620171573"       // REPLACE WITH YOUR ID NUMBER
 
 // WIFI CREDENTIALS
-#define SSID        "YOUR WIFI"      // "REPLACE WITH YOUR WIFI's SSID"   
-#define password    "YOUR PASSWORD"  // "REPLACE WITH YOUR WiFi's PASSWORD" 
+#define SSID        "Rakoon"      // "REPLACE WITH YOUR WIFI's SSID"   
+#define password    "i_isARakoon"  // "REPLACE WITH YOUR WiFi's PASSWORD" 
 
 #define stay        100
  
@@ -24,42 +25,34 @@
 #define espRX         10
 #define espTX         11
 #define espTimeout_ms 300
-//ultrasonic sensor pins
-#define TRIG_PIN 4
-#define ECHO_PIN 3
-
-// Tank geometry and measurement constants (inches)
-#define SENSOR_HEIGHT_IN 94.5
-#define MAX_WATER_HEIGHT_IN 77.763
-#define TANK_DIAMETER_IN 61.5
-#define GALLON_CUBIC_IN 231.0
-
-// HC-SR04 timing
-#define PULSE_TIMEOUT_US 30000UL
-
-// Invalid measurement sentinel
-#define INVALID_READING -1.0
+#define TRIG 4
+#define ECHO 3
+#define maxWaterHeight 77.763
+#define max 198 
+#define cap 1000
+#define tankHeight 94.5
+#define diameter 61.5
 
  
  
 /* Declare your functions below */
-double readRadarInches();
-double clampDouble(double value, double lower, double upper);
-double computeWaterHeight(double radarIn);
-double computeReserveGallons(double waterHeightIn);
-double computePercentage(double waterHeightIn);
+void espSend(char command[]);
+void espUpdate(char mssg[]);
+void espInit();
+double getWaterHeight(double distance);
+double getReserve(double height);
  
 
 SoftwareSerial esp(espRX, espTX); 
+NewPing sonar(TRIG, ECHO, max);
  
 
 void setup(){
 
   Serial.begin(115200); 
   // Configure GPIO pins here
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
-  digitalWrite(TRIG_PIN, LOW);
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
 
  
 
@@ -70,41 +63,24 @@ void setup(){
 void loop(){ 
    
   // send updates with schema ‘{"id": "student_id", "type": "ultrasonic", "radar": 0, "waterheight": 0, "reserve": 0, "percentage": 0}’
-  double radar = readRadarInches();
-
-  if (radar == INVALID_READING) {
-    Serial.println("Radar read failed (timeout/invalid). Skipping update.");
-    delay(1000);
-    return;
-  }
-
-  double waterHeight = computeWaterHeight(radar);
-  double reserve = computeReserveGallons(waterHeight);
-  double percentage = computePercentage(waterHeight);
-  bool isOverflow = (waterHeight > MAX_WATER_HEIGHT_IN);
-
-  Serial.print("radar(in): ");
-  Serial.print(radar, 2);
-  Serial.print(" | waterheight(in): ");
-  Serial.print(waterHeight, 2);
-  Serial.print(" | reserve(gal): ");
-  Serial.print(reserve, 2);
-  Serial.print(" | percentage(%): ");
-  Serial.print(percentage, 2);
-  Serial.print(" | overflow: ");
-  Serial.println(isOverflow ? "YES" : "NO");
-
-  StaticJsonDocument<256> doc;
-  char message[290] = {0};
+  unsigned int distance = sonar.ping_in();
+  Serial.println(distance);
+  double waterHeight = getWaterHeight(distance);
+  double reserve = getReserve(waterHeight);
+   double percentage = (waterHeight / maxWaterHeight) * 100;
+  JsonDocument doc;
+  
+  // 2. Create message buffer/array to store serialized JSON object
+  char message[290]  = {0};
 
   doc["id"] = idNumber;
   doc["type"] = "ultrasonic";
-  doc["radar"] = radar;
+  doc["radar"] = distance;
   doc["waterheight"] = waterHeight;
   doc["reserve"] = reserve;
   doc["percentage"] = percentage;
 
-  serializeJson(doc, message, sizeof(message));
+  serializeJson(doc, message);
 
   espUpdate(message);
 
@@ -165,57 +141,12 @@ void espInit(){
 }
 
 //***** Design and implement all util functions below ******
-double readRadarInches() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  unsigned long duration = pulseIn(ECHO_PIN, HIGH, PULSE_TIMEOUT_US);
-  if (duration == 0) {
-    return INVALID_READING;
-  }
-
-  // Speed of sound conversion for HC-SR04:
-  // distance(cm) = duration(us) * 0.0343 / 2
-  // then convert to inches by dividing by 2.54
-  double distanceCm = (duration * 0.0343) / 2.0;
-  double distanceIn = distanceCm / 2.54;
-
-  // Basic sanity bounds for this deployment
-  if (distanceIn < 0.5 || distanceIn > SENSOR_HEIGHT_IN + 10.0) {
-    return INVALID_READING;
-  }
-
-  return distanceIn;
+double getWaterHeight(double distance){
+  return tankHeight - distance;
 }
 
-double clampDouble(double value, double lower, double upper) {
-  if (value < lower) return lower;
-  if (value > upper) return upper;
-  return value;
-}
-
-double computeWaterHeight(double radarIn) {
-  // water height from tank base = sensor height - radar distance
-  double waterHeightIn = SENSOR_HEIGHT_IN - radarIn;
-  if (waterHeightIn < 0.0) {
-    waterHeightIn = 0.0;
-  }
-  return waterHeightIn;
-}
-
-double computeReserveGallons(double waterHeightIn) {
-  double radiusIn = TANK_DIAMETER_IN / 2.0;
-  double volumeIn3 = M_PI * radiusIn * radiusIn * waterHeightIn;
-  return volumeIn3 / GALLON_CUBIC_IN;
-}
-
-double computePercentage(double waterHeightIn) {
-  double raw = (waterHeightIn / MAX_WATER_HEIGHT_IN) * 100.0;
-  return clampDouble(raw, 0.0, 100.0);
+double getReserve(double height){
+  return M_PI * pow(diameter / 2.0, 2) * height / 231.0;
 }
 
 

@@ -79,7 +79,7 @@ def update():
 
             data["timestamp"] = floor(time())
 
-            Mqtt.publish("620172489", dumps(data))
+            Mqtt.publish("620171573", dumps(data))
             result = mongo.update(data)
 
             if result:

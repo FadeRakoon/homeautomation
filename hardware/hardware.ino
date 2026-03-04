@@ -98,6 +98,7 @@ void digit4(uint8_t number);
 
 void checkPasscode(void);
 void showisLocked(void);
+void drawBitmapTransparent(int16_t x, int16_t y, const uint16_t *bitmap, int16_t w, int16_t h, uint16_t transparentColor);
 
 
 
@@ -119,6 +120,8 @@ uint8_t passcode = 1;
 uint16_t potValue = 0;
 int mappedValue = 0;
 
+#define ORANGE_TEXT 0xFD20
+
 
  
  
@@ -129,8 +132,9 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_R
 void setup() {
     Serial.begin(115200);  // INIT SERIAL  
     tft.begin();
-    tft.fillScreen(ILI9341_WHITE);
-    tft.setTextColor(ILI9341_RED);
+  tft.fillScreen(ILI9341_BLACK);
+  tft.fillRect(0, 0, 240, 160, ILI9341_WHITE);
+  tft.setTextColor(ORANGE_TEXT);
     tft.setTextSize(2);
 
      // CONFIGURE THE ARDUINO PINS OF THE 7SEG AS OUTPUT
@@ -264,8 +268,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
  
   // CONVERT MESSAGE TO JSON
-   JsonDocument doc;
-   DeserializationError error = deserializeJson(doc, received);
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, received);
 
   if (error) {
     Serial.print("deserializeJson() failed: ");
@@ -317,7 +321,7 @@ void digit1(uint8_t number){
   // 3. Set cursor to the appropriate coordinates in order to write the number in the middle of the box 
   tft.setCursor(20, 295);
   // 4. Set the text colour of the number. Use any colour you like 
-  tft.setTextColor(ILI9341_RED);
+  tft.setTextColor(ORANGE_TEXT);
   // 5. Set font size to one
    tft.setTextSize(1);
   // 6. Print number to the screen
@@ -342,7 +346,7 @@ void digit2(uint8_t number){
   int fillColor = ILI9341_BLUE;
   tft.fillRoundRect(rectX, rectY, rectWidth, rectHeight, cornerRadius, fillColor);
   tft.setCursor(80, 295);
-  tft.setTextColor(ILI9341_RED);
+  tft.setTextColor(ORANGE_TEXT);
   tft.setTextSize(1);
   tft.print(number); 
 }
@@ -355,6 +359,7 @@ void digit3(uint8_t number){
   // 4. Set the text colour of the number. Use any colour you like 
   // 5. Set font size to one 
   // 6. Print number to the screen
+  tft.setFont(&FreeSansBold18pt7b);
   int rectX = 125;
   int rectY = 260; 
   int rectWidth = 50; 
@@ -363,7 +368,7 @@ void digit3(uint8_t number){
   int fillColor = ILI9341_BLUE;
   tft.fillRoundRect(rectX, rectY, rectWidth, rectHeight, cornerRadius, fillColor);
   tft.setCursor(140, 295);
-  tft.setTextColor(ILI9341_RED);
+  tft.setTextColor(ORANGE_TEXT);
   tft.setTextSize(1);
   tft.print(number); 
 }
@@ -385,7 +390,7 @@ void digit4(uint8_t number){
   int fillColor = ILI9341_BLUE;
   tft.fillRoundRect(rectX, rectY, rectWidth, rectHeight, cornerRadius, fillColor);
   tft.setCursor(200, 295);
-  tft.setTextColor(ILI9341_RED);
+  tft.setTextColor(ORANGE_TEXT);
   tft.setTextSize(1);
   tft.print(number);
 
@@ -400,7 +405,7 @@ void checkPasscode(void){
     if(WiFi.status()== WL_CONNECTED){ 
       
       // 1. REPLACE LOCALHOST IN THE STRING BELOW WITH THE IP ADDRESS OF THE COMPUTER THAT YOUR BACKEND IS RUNNING ON
-      http.begin(client, "http://localhost:8080/api/check/combination"); // Your Domain name with URL path or IP address with path 
+      http.begin(client, "http://10.162.0.145:8080/api/check/combination"); // Your Domain name with URL path or IP address with path 
  
       
       http.addHeader("Content-Type", "application/x-www-form-urlencoded"); // Specify content-type header      
@@ -454,25 +459,33 @@ void showisLocked(void){
     tft.setTextSize(1);
     
 
+    tft.fillRect(68, 10, 104, 103, ILI9341_WHITE);
+    tft.fillRect(40, 180, 180, 30, ILI9341_BLACK);
+
     if(isLocked == true){
-      tft.drawRGBBitmap(68,10, lockopen, 104, 97); 
-      tft.setCursor(50, 200);  
-      tft.setTextColor(ILI9341_WHITE); 
-      tft.printf("Access Denied"); 
-      tft.setCursor(50, 200);  
-      tft.setTextColor(ILI9341_GREEN); 
+      drawBitmapTransparent(68, 10, lockopen, 104, 97, 0xFFFF);
+      tft.setCursor(50, 200);
+      tft.setTextColor(ORANGE_TEXT);
       tft.printf("Access Granted");
       
     }
     else {
-      tft.drawRGBBitmap(68,10, lockclose, 104, 103); 
-      tft.setCursor(50, 200);  
-      tft.setTextColor(ILI9341_WHITE); 
-      tft.printf("Access Granted"); 
-      tft.setCursor(50, 200);  
-      tft.setTextColor(ILI9341_RED); 
-      tft.printf("Access Denied"); 
+      drawBitmapTransparent(68, 10, lockclose, 104, 103, 0xFFFF);
+      tft.setCursor(50, 200);
+      tft.setTextColor(ORANGE_TEXT);
+      tft.printf("Access Denied");
     }
     
+}
+
+void drawBitmapTransparent(int16_t x, int16_t y, const uint16_t *bitmap, int16_t w, int16_t h, uint16_t transparentColor){
+  for (int16_t row = 0; row < h; row++) {
+    for (int16_t col = 0; col < w; col++) {
+      uint16_t color = pgm_read_word(&bitmap[row * w + col]);
+      if (color != transparentColor) {
+        tft.drawPixel(x + col, y + row, color);
+      }
+    }
+  }
 }
  
