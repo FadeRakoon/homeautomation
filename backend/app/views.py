@@ -27,14 +27,99 @@ from math import floor
 
 
 # 1. CREATE ROUTE FOR '/api/set/combination'
-    
+@app.route('/api/set/combination', methods=["POST"])
+def set_combination():
+    if request.method == "POST":
+        try:
+            passcode = request.form.get("passcode")
+
+            #Must be integer and exactly 4 digits
+            if passcode is None or len(passcode) != 4 or not passcode.isdigit():
+                return jsonify({"status": "failed", "data": "failed"})
+
+            result = mongo.setPasscode(passcode)
+
+            if result:
+                return jsonify({"status": "complete", "data": "complete"})
+
+        except Exception as e:
+            print(f"set_combination error: {str(e)}")
+
+    return jsonify({"status": "failed", "data": "failed"})
+
 # 2. CREATE ROUTE FOR '/api/check/combination'
+@app.route('/api/check/combination', methods=["POST"])
+def check_combination():
+    if request.method == "POST":
+        try:
+            passcode = request.form.get("passcode")
+
+            if passcode is None:
+                return jsonify({"status": "failed", "data": "failed"})
+
+            count = mongo.checkPasscode(passcode)
+
+            if count > 0:
+                return jsonify({"status": "complete", "data": "complete"})
+
+        except Exception as e:
+            print(f"check_combination error: {str(e)}")
+
+    return jsonify({"status": "failed", "data": "failed"})
 
 # 3. CREATE ROUTE FOR '/api/update'
-   
+@app.route('/api/update', methods=["POST"])
+def update():
+    if request.method == "POST":
+        try:
+            data = request.get_json(force=True)
+
+            if data is None:
+                return jsonify({"status": "failed", "data": "failed"})
+
+            data["timestamp"] = floor(time())
+
+            Mqtt.publish("620172489", dumps(data))
+            result = mongo.update(data)
+
+            if result:
+                return jsonify({"status": "complete", "data": "complete"})
+
+        except Exception as e:
+            print(f"update error: {str(e)}")
+
+    return jsonify({"status": "failed", "data": "failed"})
+
 # 4. CREATE ROUTE FOR '/api/reserve/<start>/<end>'
+@app.route('/api/reserve/<start>/<end>', methods=["GET"])
+def get_reserve(start, end):
+    if request.method == "GET":
+        try:
+            data = mongo.getReserve(start, end)
+
+            if data is not None and len(data) > 0:
+                return jsonify({"status": "found", "data": data})
+
+        except Exception as e:
+            print(f"get_reserve error: {str(e)}")
+
+    return jsonify({"status": "failed", "data": 0})
 
 # 5. CREATE ROUTE FOR '/api/avg/<start>/<end>'
+@app.route('/api/avg/<start>/<end>', methods=["GET"])
+def avg_reserve(start, end):
+    if request.method == "GET":
+        try:
+            result = mongo.avgReserve(start, end)
+
+            if result and len(result) > 0:
+                avg = result[0]["average"]
+                return jsonify({"status": "found", "data": avg})
+
+        except Exception as e:
+            print(f"avg_reserve error: {str(e)}")
+
+    return jsonify({"status": "failed", "data": 0})
 
 
    
