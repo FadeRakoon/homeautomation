@@ -10,6 +10,7 @@
             color="green"
             track-color="green-lighten-3"
             thumb-color="green-darken-2"
+            track-size="30"
             label=" Height(in)"
           ></v-slider>
         </v-sheet>
