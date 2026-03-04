@@ -9,7 +9,6 @@
 #include <rom/rtc.h>
 
 
-
 //IMPORT IMAGES
 #include "lockclose.h"
 #include "lockopen.h"
@@ -30,8 +29,15 @@
 
 #ifndef ARDUINO_H
 #include <Arduino.h>
-#endif 
- 
+#endif
+
+#ifndef ARDUINOJSON_H
+#include <ArduinoJson.h>
+#endif
+
+#include <SPI.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_ILI9341.h"
 
 
 // DEFINE VARIABLES
@@ -62,8 +68,8 @@ static const char* mqtt_server   = "www.yanacreations.com";         // Broker IP
 static uint16_t mqtt_port        = 1883;
 
 // WIFI CREDENTIALS
-const char* ssid       = "YOUR_SSID"; // Add your Wi-Fi ssid
-const char* password   = "YOUR_PASS"; // Add your Wi-Fi password 
+const char* ssid       = "Rakoon"; // Add your Wi-Fi ssid
+const char* password   = "i_isARakoon"; // Add your Wi-Fi password 
 
 
 
@@ -91,7 +97,7 @@ void digit3(uint8_t number);
 void digit4(uint8_t number);
 
 void checkPasscode(void);
-void showLockState(void);
+void showisLocked(void);
 
 
 
@@ -107,7 +113,7 @@ void showLockState(void);
 
 /* Initialize class objects*/
 uint8_t currentDigit = 1; // Keeps track of the current digit being modified by the potentiometer
-bool lockState = false; // keeps track of the Open and Close state of the lock
+bool isLocked = false; // keeps track of the Open and Close state of the lock
 uint8_t digit1V = 0, digit2V = 0, digit3V = 0, digit4V = 0;
 uint8_t passcode = 1;
 uint16_t potValue = 0;
@@ -217,7 +223,7 @@ void vButtonCheck( void * pvParameters )  {
          if (digitalRead(BTN_3) == 0)
         {
           isLocked = false;
-          showLockState();
+          showisLocked();
         }
        
         vTaskDelay(200 / portTICK_PERIOD_MS);  
@@ -378,7 +384,7 @@ void digit4(uint8_t number){
   int cornerRadius = 5; 
   int fillColor = ILI9341_BLUE;
   tft.fillRoundRect(rectX, rectY, rectWidth, rectHeight, cornerRadius, fillColor);
-  tft.setCursor(200, 295)
+  tft.setCursor(200, 295);
   tft.setTextColor(ILI9341_RED);
   tft.setTextSize(1);
   tft.print(number);
@@ -421,14 +427,14 @@ void checkPasscode(void){
 
         // 4. PROCESS MESSAGE. The response from the route that is used to validate the passcode
         // will be either {"status":"complete","data":"complete"}  or {"status":"failed","data":"failed"} schema.
-        // (1) if the status is complete, set the lockState variable to true, then invoke the showLockState function
-        // (2) otherwise, set the lockState variable to false, then invoke the showLockState function
+        // (1) if the status is complete, set the isLocked variable to true, then invoke the showisLocked function
+        // (2) otherwise, set the isLocked variable to false, then invoke the showisLocked function
         if (doc["status"] == "complete") {
           isLocked = true;
-          showLockState();
+          showisLocked();
         } else {
           isLocked = false;
-          showLockState();
+          showisLocked();
         }      
       }     
         
@@ -441,14 +447,14 @@ void checkPasscode(void){
 
 
 
-void showLockState(void){
+void showisLocked(void){
   
-    // Toggles the open and close lock images on the screen based on the lockState variable  
+    // Toggles the open and close lock images on the screen based on the isLocked variable  
     tft.setFont(&FreeSansBold9pt7b);  
     tft.setTextSize(1);
     
 
-    if(lockState == true){
+    if(isLocked == true){
       tft.drawRGBBitmap(68,10, lockopen, 104, 97); 
       tft.setCursor(50, 200);  
       tft.setTextColor(ILI9341_WHITE); 
